@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 
 from app.ui.screens.categories_screen import CategoriesScreen
 from app.ui.screens.dashboard_screen import DashboardScreen
+from app.ui.screens.expenses_screen import ExpensesScreen
 from app.ui.screens.inventory_screen import InventoryScreen
 from app.ui.screens.pos_screen import POSScreen
 from app.ui.screens.products_screen import ProductsScreen
@@ -34,6 +35,7 @@ class AppWindow(QMainWindow):
         self.stack.addWidget(CategoriesScreen())
         self.stack.addWidget(InventoryScreen())
         self.stack.addWidget(POSScreen())
+        self.stack.addWidget(ExpensesScreen())
         self.stack.addWidget(SettingsScreen())
 
         self.nav_list.currentRowChanged.connect(self.stack.setCurrentIndex)

@@ -5,6 +5,7 @@ from app.database.models.product import Product
 from app.database.models.stock_movement import StockMovement
 from app.database.models.sale import Sale
 from app.database.models.sale_item import SaleItem
+from app.database.models.expense import Expense
 
 __all__ = [
     "Business",
@@ -14,4 +15,5 @@ __all__ = [
     "StockMovement",
     "Sale",
     "SaleItem",
+    "Expense",
 ]
