@@ -1,22 +1,21 @@
-from PySide6.QtWidgets import QApplication, QLabel, QMainWindow
 import sys
 
+from PySide6.QtWidgets import QApplication
 
-class MainWindow(QMainWindow):
-    def __init__(self) -> None:
-        super().__init__()
-        self.setWindowTitle("Business Management Tool")
-        self.setMinimumSize(1200, 700)
-
-        label = QLabel("Business Management Tool MVP")
-        label.setMargin(20)
-        self.setCentralWidget(label)
+from app.core.config import APP_NAME
+from app.database.init_db import init_db
+from app.ui.app_window import AppWindow
 
 
 def main() -> None:
+    init_db()
+
     app = QApplication(sys.argv)
-    window = MainWindow()
+    app.setApplicationName(APP_NAME)
+
+    window = AppWindow()
     window.show()
+
     sys.exit(app.exec())
 
 
