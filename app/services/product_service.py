@@ -1,3 +1,6 @@
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+
 from app.database.models.product import Product
 from app.database.repositories.product_repo import ProductRepository
 from app.database.session import SessionLocal
@@ -6,8 +9,12 @@ from app.database.session import SessionLocal
 class ProductService:
     def list_products(self) -> list[Product]:
         with SessionLocal() as session:
-            repo = ProductRepository(session)
-            return repo.list_all()
+            stmt = (
+                select(Product)
+                .options(selectinload(Product.category))
+                .order_by(Product.id.desc())
+            )
+            return list(session.scalars(stmt).all())
 
     def create_product(
         self,

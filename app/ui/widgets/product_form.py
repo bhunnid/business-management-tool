@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import (
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
@@ -12,16 +13,23 @@ from app.database.models.product import Product
 
 
 class ProductFormDialog(QDialog):
-    def __init__(self, parent=None, product: Product | None = None) -> None:
+    def __init__(self, parent=None, product: Product | None = None, categories: list | None = None) -> None:
         super().__init__(parent)
         self.product = product
+        self.categories = categories or []
+
         self.setWindowTitle("Add Product" if product is None else "Edit Product")
         self.setModal(True)
-        self.resize(420, 260)
+        self.resize(420, 300)
 
         self.name_input = QLineEdit()
         self.sku_input = QLineEdit()
         self.barcode_input = QLineEdit()
+
+        self.category_input = QComboBox()
+        self.category_input.addItem("Uncategorized", None)
+        for category in self.categories:
+            self.category_input.addItem(category.name, category.id)
 
         self.buying_price_input = QDoubleSpinBox()
         self.buying_price_input.setMaximum(1_000_000_000)
@@ -43,14 +51,13 @@ class ProductFormDialog(QDialog):
         form.addRow("Name", self.name_input)
         form.addRow("SKU", self.sku_input)
         form.addRow("Barcode", self.barcode_input)
+        form.addRow("Category", self.category_input)
         form.addRow("Buying Price", self.buying_price_input)
         form.addRow("Selling Price", self.selling_price_input)
         form.addRow("Stock Qty", self.stock_input)
         form.addRow("Reorder Level", self.reorder_input)
 
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.Save | QDialogButtonBox.Cancel
-        )
+        buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self._validate_and_accept)
         buttons.rejected.connect(self.reject)
 
@@ -70,6 +77,10 @@ class ProductFormDialog(QDialog):
         self.stock_input.setValue(float(self.product.quantity_in_stock))
         self.reorder_input.setValue(float(self.product.reorder_level))
 
+        index = self.category_input.findData(self.product.category_id)
+        if index >= 0:
+            self.category_input.setCurrentIndex(index)
+
     def _validate_and_accept(self) -> None:
         if not self.name_input.text().strip():
             QMessageBox.warning(self, "Validation Error", "Product name is required.")
@@ -81,6 +92,7 @@ class ProductFormDialog(QDialog):
             "name": self.name_input.text().strip(),
             "sku": self.sku_input.text().strip() or None,
             "barcode": self.barcode_input.text().strip() or None,
+            "category_id": self.category_input.currentData(),
             "buying_price": float(self.buying_price_input.value()),
             "selling_price": float(self.selling_price_input.value()),
             "quantity_in_stock": float(self.stock_input.value()),

@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -11,8 +11,11 @@ from PySide6.QtWidgets import (
 )
 
 from app.database.seed import ensure_default_business
+from app.services.category_service import CategoryService
+from app.services.inventory_service import InventoryService
 from app.services.product_service import ProductService
 from app.ui.widgets.product_form import ProductFormDialog
+from app.ui.widgets.stock_adjustment_dialog import StockAdjustmentDialog
 
 
 class ProductsScreen(QWidget):
@@ -20,6 +23,8 @@ class ProductsScreen(QWidget):
         super().__init__()
 
         self.product_service = ProductService()
+        self.category_service = CategoryService()
+        self.inventory_service = InventoryService()
         self.business = ensure_default_business()
         self.products = []
 
@@ -28,18 +33,20 @@ class ProductsScreen(QWidget):
         self.add_btn = QPushButton("Add Product")
         self.edit_btn = QPushButton("Edit Selected")
         self.delete_btn = QPushButton("Delete Selected")
+        self.adjust_btn = QPushButton("Adjust Stock")
         self.refresh_btn = QPushButton("Refresh")
 
         actions_layout = QHBoxLayout()
         actions_layout.addWidget(self.add_btn)
         actions_layout.addWidget(self.edit_btn)
         actions_layout.addWidget(self.delete_btn)
+        actions_layout.addWidget(self.adjust_btn)
         actions_layout.addStretch()
         actions_layout.addWidget(self.refresh_btn)
 
-        self.table = QTableWidget(0, 6)
+        self.table = QTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels(
-            ["ID", "Name", "SKU", "Buying Price", "Selling Price", "Stock"]
+            ["ID", "Name", "Category", "SKU", "Buying Price", "Selling Price", "Stock"]
         )
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
@@ -53,6 +60,7 @@ class ProductsScreen(QWidget):
         self.add_btn.clicked.connect(self.add_product)
         self.edit_btn.clicked.connect(self.edit_selected_product)
         self.delete_btn.clicked.connect(self.delete_selected_product)
+        self.adjust_btn.clicked.connect(self.adjust_selected_stock)
         self.refresh_btn.clicked.connect(self.load_products)
 
         self.load_products()
@@ -62,38 +70,45 @@ class ProductsScreen(QWidget):
         self.table.setRowCount(len(self.products))
 
         for row, product in enumerate(self.products):
-            id_item = QTableWidgetItem(str(product.id))
-            id_item.setData(Qt.UserRole, product.id)
+            category_name = ""
+            if getattr(product, "category", None) is not None:
+                category_name = product.category.name
 
-            self.table.setItem(row, 0, id_item)
-            self.table.setItem(row, 1, QTableWidgetItem(product.name))
-            self.table.setItem(row, 2, QTableWidgetItem(product.sku or ""))
-            self.table.setItem(row, 3, QTableWidgetItem(f"{product.buying_price:.2f}"))
-            self.table.setItem(row, 4, QTableWidgetItem(f"{product.selling_price:.2f}"))
-            self.table.setItem(row, 5, QTableWidgetItem(f"{product.quantity_in_stock:.2f}"))
+            items = [
+                QTableWidgetItem(str(product.id)),
+                QTableWidgetItem(product.name),
+                QTableWidgetItem(category_name),
+                QTableWidgetItem(product.sku or ""),
+                QTableWidgetItem(f"{product.buying_price:.2f}"),
+                QTableWidgetItem(f"{product.selling_price:.2f}"),
+                QTableWidgetItem(f"{product.quantity_in_stock:.2f}"),
+            ]
+
+            for col, item in enumerate(items):
+                if product.quantity_in_stock <= product.reorder_level:
+                    item.setBackground(QColor(255, 230, 230))
+                self.table.setItem(row, col, item)
 
         self.table.resizeColumnsToContents()
 
-    def get_selected_product_id(self) -> int | None:
+    def get_selected_product(self):
         row = self.table.currentRow()
         if row < 0:
             return None
+
         item = self.table.item(row, 0)
         if item is None:
             return None
-        return int(item.data(Qt.UserRole))
 
-    def get_selected_product(self):
-        product_id = self.get_selected_product_id()
-        if product_id is None:
-            return None
+        product_id = int(item.text())
         for product in self.products:
             if product.id == product_id:
                 return product
         return None
 
     def add_product(self) -> None:
-        dialog = ProductFormDialog(self)
+        categories = self.category_service.list_categories(self.business.id)
+        dialog = ProductFormDialog(self, categories=categories)
         if dialog.exec():
             data = dialog.get_data()
             try:
@@ -102,6 +117,7 @@ class ProductsScreen(QWidget):
                     name=data["name"],
                     sku=data["sku"],
                     barcode=data["barcode"],
+                    category_id=data["category_id"],
                     buying_price=data["buying_price"],
                     selling_price=data["selling_price"],
                     quantity_in_stock=data["quantity_in_stock"],
@@ -117,7 +133,8 @@ class ProductsScreen(QWidget):
             QMessageBox.information(self, "No Selection", "Select a product first.")
             return
 
-        dialog = ProductFormDialog(self, product=product)
+        categories = self.category_service.list_categories(self.business.id)
+        dialog = ProductFormDialog(self, product=product, categories=categories)
         if dialog.exec():
             data = dialog.get_data()
             try:
@@ -126,6 +143,7 @@ class ProductsScreen(QWidget):
                     name=data["name"],
                     sku=data["sku"],
                     barcode=data["barcode"],
+                    category_id=data["category_id"],
                     buying_price=data["buying_price"],
                     selling_price=data["selling_price"],
                     quantity_in_stock=data["quantity_in_stock"],
@@ -154,3 +172,23 @@ class ProductsScreen(QWidget):
             self.load_products()
         except Exception as exc:
             QMessageBox.critical(self, "Error", str(exc))
+
+    def adjust_selected_stock(self) -> None:
+        product = self.get_selected_product()
+        if product is None:
+            QMessageBox.information(self, "No Selection", "Select a product first.")
+            return
+
+        dialog = StockAdjustmentDialog(self, product=product)
+        if dialog.exec():
+            data = dialog.get_data()
+            try:
+                self.inventory_service.adjust_stock(
+                    product_id=product.id,
+                    movement_type=data["movement_type"],
+                    quantity=data["quantity"],
+                    reference=data["reference"],
+                )
+                self.load_products()
+            except Exception as exc:
+                QMessageBox.critical(self, "Error", str(exc))
