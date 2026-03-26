@@ -19,6 +19,8 @@ from PySide6.QtWidgets import (
 from app.database.seed import ensure_default_business
 from app.services.pos_service import POSService
 from app.services.product_service import ProductService
+from app.services.signals import app_signals
+from app.ui.widgets.receipt_dialog import ReceiptDialog
 
 
 class POSScreen(QWidget):
@@ -37,10 +39,15 @@ class POSScreen(QWidget):
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search product by name, SKU, or barcode")
+        self.search_input.setMinimumHeight(35)
+        self.search_input.setStyleSheet("font-size: 13px; padding: 5px;")
 
         self.product_list = QListWidget()
+        self.product_list.setSelectionMode(QAbstractItemView.SingleSelection)
 
         self.add_btn = QPushButton("Add to Cart")
+        self.add_btn.setStyleSheet("padding: 12px; font-size: 13px; font-weight: bold;")
+        self.add_btn.setMinimumHeight(40)
         self.remove_btn = QPushButton("Remove Selected")
         self.clear_btn = QPushButton("Clear Cart")
 
@@ -95,6 +102,7 @@ class POSScreen(QWidget):
         main_layout.addLayout(content)
 
         self.search_input.textChanged.connect(self.filter_products)
+        self.product_list.doubleClicked.connect(self.add_selected_product_to_cart)
         self.add_btn.clicked.connect(self.add_selected_product_to_cart)
         self.remove_btn.clicked.connect(self.remove_selected_cart_item)
         self.clear_btn.clicked.connect(self.clear_cart)
@@ -103,6 +111,7 @@ class POSScreen(QWidget):
         self.mpesa_btn.clicked.connect(lambda: self.complete_sale("mpesa"))
 
         self.load_products()
+        app_signals.product_changed.connect(self.load_products)
 
     def load_products(self) -> None:
         self.products = [p for p in self.product_service.list_products() if p.active]
@@ -124,10 +133,12 @@ class POSScreen(QWidget):
 
         filtered = []
         for product in self.products:
+            category_name = product.category.name if product.category else ""
             haystack = " ".join([
                 product.name or "",
                 product.sku or "",
                 product.barcode or "",
+                category_name or "",
             ]).lower()
             if term in haystack:
                 filtered.append(product)
@@ -147,13 +158,21 @@ class POSScreen(QWidget):
             return
 
         if product.quantity_in_stock <= 0:
-            QMessageBox.warning(self, "Out of Stock", "This product is out of stock.")
+            QMessageBox.warning(
+                self,
+                "Out of Stock",
+                f"{product.name} is currently out of stock. No items available to sell.",
+            )
             return
 
         existing = next((x for x in self.cart if x["product_id"] == product.id), None)
         if existing:
             if existing["quantity"] + 1 > product.quantity_in_stock:
-                QMessageBox.warning(self, "Stock Limit", "Cannot add more than available stock.")
+                QMessageBox.warning(
+                    self,
+                    "Stock Limit",
+                    f"Cannot add more of {product.name}. Only {product.quantity_in_stock} available.",
+                )
                 return
             existing["quantity"] += 1
         else:
@@ -224,12 +243,13 @@ class POSScreen(QWidget):
             QMessageBox.critical(self, "Sale Failed", str(exc))
             return
 
-        QMessageBox.information(
-            self,
-            "Sale Complete",
-            f"Sale saved successfully.\n\nSale No: {sale.id}\nTotal: {sale.total:.2f}"
-        )
+        # Fetch and display receipt
+        receipt_data = self.pos_service.get_sale_receipt(self.business.id, sale.id)
+        if receipt_data:
+            receipt_dialog = ReceiptDialog(receipt_data, self)
+            receipt_dialog.exec()
 
+        # Clear cart and refresh
         self.cart.clear()
         self.discount_input.setValue(0.0)
         self.refresh_cart_table()

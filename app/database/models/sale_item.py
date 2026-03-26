@@ -16,3 +16,4 @@ class SaleItem(Base):
     line_total: Mapped[float] = mapped_column(Float, nullable=False)
 
     sale = relationship("Sale", back_populates="items")
+    product = relationship("Product")

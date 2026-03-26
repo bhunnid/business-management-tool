@@ -1,3 +1,4 @@
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -38,9 +39,14 @@ class ExpensesScreen(QWidget):
             ["ID", "Category", "Amount", "Payment", "Reference", "Date"]
         )
 
+        self.empty_state_label = QLabel("No expenses recorded yet.")
+        self.empty_state_label.setStyleSheet("color: #999; font-size: 13px; text-align: center;")
+        self.empty_state_label.setAlignment(Qt.AlignCenter)
+
         layout = QVBoxLayout(self)
         layout.addWidget(self.title)
         layout.addLayout(actions)
+        layout.addWidget(self.empty_state_label)
         layout.addWidget(self.table)
 
         self.add_btn.clicked.connect(self.add_expense)
@@ -51,6 +57,14 @@ class ExpensesScreen(QWidget):
     def load_expenses(self) -> None:
         self.expenses = self.expense_service.list_recent_expenses(self.business.id, limit=200)
         self.table.setRowCount(len(self.expenses))
+
+        # Show/hide empty state
+        if len(self.expenses) == 0:
+            self.empty_state_label.setVisible(True)
+            self.table.setVisible(False)
+        else:
+            self.empty_state_label.setVisible(False)
+            self.table.setVisible(True)
 
         for row, expense in enumerate(self.expenses):
             self.table.setItem(row, 0, QTableWidgetItem(str(expense.id)))
@@ -76,6 +90,7 @@ class ExpensesScreen(QWidget):
                     reference=data["reference"],
                     recorded_by=None,
                 )
+                QMessageBox.information(self, "Success", "Expense recorded successfully.")
                 self.load_expenses()
             except Exception as exc:
                 QMessageBox.critical(self, "Error", str(exc))

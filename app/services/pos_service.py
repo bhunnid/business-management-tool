@@ -6,6 +6,7 @@ from app.database.models.sale_item import SaleItem
 from app.database.repositories.sale_repo import SaleRepository
 from app.database.repositories.stock_movement_repo import StockMovementRepository
 from app.database.session import SessionLocal
+from app.services.receipt_service import ReceiptService
 
 
 class POSService:
@@ -111,3 +112,8 @@ class POSService:
             session.commit()
             session.refresh(sale)
             return sale
+
+    def get_sale_receipt(self, business_id: int, sale_id: int) -> dict | None:
+        """Fetch receipt data for a completed sale."""
+        receipt_service = ReceiptService()
+        return receipt_service.get_receipt_data(business_id, sale_id)

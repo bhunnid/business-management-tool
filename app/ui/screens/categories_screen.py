@@ -1,3 +1,4 @@
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -23,10 +24,13 @@ class CategoriesScreen(QWidget):
         self.categories = []
 
         self.title = QLabel("Categories")
+        self.title.setStyleSheet("font-size: 18px; font-weight: 600;")
 
         self.add_btn = QPushButton("Add Category")
-        self.edit_btn = QPushButton("Edit Selected")
-        self.delete_btn = QPushButton("Delete Selected")
+        self.edit_btn = QPushButton("Edit")
+        self.edit_btn.setEnabled(False)
+        self.delete_btn = QPushButton("Remove")
+        self.delete_btn.setEnabled(False)
         self.refresh_btn = QPushButton("Refresh")
 
         actions = QHBoxLayout()
@@ -42,21 +46,43 @@ class CategoriesScreen(QWidget):
         self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
 
+        self.empty_state_label = QLabel("No categories yet. Add one to get started.")
+        self.empty_state_label.setStyleSheet("color: #999; font-size: 13px; text-align: center;")
+        self.empty_state_label.setAlignment(Qt.AlignCenter)
+
         layout = QVBoxLayout(self)
         layout.addWidget(self.title)
         layout.addLayout(actions)
+        layout.addWidget(self.empty_state_label)
         layout.addWidget(self.table)
 
         self.add_btn.clicked.connect(self.add_category)
         self.edit_btn.clicked.connect(self.edit_selected_category)
         self.delete_btn.clicked.connect(self.delete_selected_category)
         self.refresh_btn.clicked.connect(self.load_categories)
+        self.table.itemSelectionChanged.connect(self.on_selection_changed)
 
         self.load_categories()
+
+    def on_selection_changed(self) -> None:
+        """Enable/disable buttons based on selection."""
+        has_selection = self.table.currentRow() >= 0
+        self.edit_btn.setEnabled(has_selection)
+        self.delete_btn.setEnabled(has_selection)
 
     def load_categories(self) -> None:
         self.categories = self.category_service.list_categories(self.business.id)
         self.table.setRowCount(len(self.categories))
+
+        # Show/hide empty state
+        if len(self.categories) == 0:
+            self.empty_state_label.setVisible(True)
+            self.table.setVisible(False)
+            self.edit_btn.setEnabled(False)
+            self.delete_btn.setEnabled(False)
+        else:
+            self.empty_state_label.setVisible(False)
+            self.table.setVisible(True)
 
         for row, category in enumerate(self.categories):
             self.table.setItem(row, 0, QTableWidgetItem(str(category.id)))
@@ -84,6 +110,7 @@ class CategoriesScreen(QWidget):
             data = dialog.get_data()
             try:
                 self.category_service.create_category(self.business.id, data["name"])
+                QMessageBox.information(self, "Success", "Category added successfully.")
                 self.load_categories()
             except Exception as exc:
                 QMessageBox.critical(self, "Error", str(exc))
@@ -99,6 +126,7 @@ class CategoriesScreen(QWidget):
             data = dialog.get_data()
             try:
                 self.category_service.update_category(category.id, self.business.id, data["name"])
+                QMessageBox.information(self, "Success", "Category updated successfully.")
                 self.load_categories()
             except Exception as exc:
                 QMessageBox.critical(self, "Error", str(exc))
@@ -119,6 +147,7 @@ class CategoriesScreen(QWidget):
 
         try:
             self.category_service.delete_category(category.id)
+            QMessageBox.information(self, "Success", "Category removed successfully.")
             self.load_categories()
         except Exception as exc:
             QMessageBox.critical(self, "Error", str(exc))

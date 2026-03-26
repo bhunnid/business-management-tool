@@ -4,6 +4,7 @@ from sqlalchemy.orm import selectinload
 from app.database.models.product import Product
 from app.database.repositories.product_repo import ProductRepository
 from app.database.session import SessionLocal
+from app.services.signals import app_signals
 
 
 class ProductService:
@@ -37,7 +38,7 @@ class ProductService:
 
         with SessionLocal() as session:
             repo = ProductRepository(session)
-            return repo.create(
+            product = repo.create(
                 business_id=business_id,
                 category_id=category_id,
                 sku=sku or None,
@@ -48,6 +49,8 @@ class ProductService:
                 quantity_in_stock=quantity_in_stock,
                 reorder_level=reorder_level,
             )
+            app_signals.product_changed.emit()
+            return product
 
     def update_product(
         self,
@@ -74,7 +77,7 @@ class ProductService:
             if product is None:
                 raise ValueError("Product not found.")
 
-            return repo.update(
+            updated = repo.update(
                 product,
                 category_id=category_id,
                 sku=sku or None,
@@ -85,6 +88,8 @@ class ProductService:
                 quantity_in_stock=quantity_in_stock,
                 reorder_level=reorder_level,
             )
+            app_signals.product_changed.emit()
+            return updated
 
     def delete_product(self, product_id: int) -> None:
         with SessionLocal() as session:
@@ -93,3 +98,4 @@ class ProductService:
             if product is None:
                 raise ValueError("Product not found.")
             repo.delete(product)
+            app_signals.product_changed.emit()

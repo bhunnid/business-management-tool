@@ -1,3 +1,4 @@
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -14,6 +15,7 @@ from app.database.seed import ensure_default_business
 from app.services.category_service import CategoryService
 from app.services.inventory_service import InventoryService
 from app.services.product_service import ProductService
+from app.services.signals import app_signals
 from app.ui.widgets.product_form import ProductFormDialog
 from app.ui.widgets.stock_adjustment_dialog import StockAdjustmentDialog
 
@@ -29,11 +31,15 @@ class ProductsScreen(QWidget):
         self.products = []
 
         self.title = QLabel("Products")
+        self.title.setStyleSheet("font-size: 18px; font-weight: 600;")
 
         self.add_btn = QPushButton("Add Product")
-        self.edit_btn = QPushButton("Edit Selected")
+        self.edit_btn = QPushButton("Edit")
+        self.edit_btn.setEnabled(False)
         self.delete_btn = QPushButton("Remove")
+        self.delete_btn.setEnabled(False)
         self.adjust_btn = QPushButton("Change Stock")
+        self.adjust_btn.setEnabled(False)
         self.refresh_btn = QPushButton("Refresh")
 
         actions_layout = QHBoxLayout()
@@ -52,9 +58,14 @@ class ProductsScreen(QWidget):
         self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
 
+        self.empty_state_label = QLabel("No products yet. Add one to get started.")
+        self.empty_state_label.setStyleSheet("color: #999; font-size: 13px; text-align: center;")
+        self.empty_state_label.setAlignment(Qt.AlignCenter)
+
         layout = QVBoxLayout(self)
         layout.addWidget(self.title)
         layout.addLayout(actions_layout)
+        layout.addWidget(self.empty_state_label)
         layout.addWidget(self.table)
 
         self.add_btn.clicked.connect(self.add_product)
@@ -62,12 +73,31 @@ class ProductsScreen(QWidget):
         self.delete_btn.clicked.connect(self.delete_selected_product)
         self.adjust_btn.clicked.connect(self.adjust_selected_stock)
         self.refresh_btn.clicked.connect(self.load_products)
+        self.table.itemSelectionChanged.connect(self.on_selection_changed)
 
         self.load_products()
+
+    def on_selection_changed(self) -> None:
+        """Enable/disable buttons based on selection."""
+        has_selection = self.table.currentRow() >= 0
+        self.edit_btn.setEnabled(has_selection)
+        self.delete_btn.setEnabled(has_selection)
+        self.adjust_btn.setEnabled(has_selection)
 
     def load_products(self) -> None:
         self.products = self.product_service.list_products()
         self.table.setRowCount(len(self.products))
+
+        # Show/hide empty state
+        if len(self.products) == 0:
+            self.empty_state_label.setVisible(True)
+            self.table.setVisible(False)
+            self.edit_btn.setEnabled(False)
+            self.delete_btn.setEnabled(False)
+            self.adjust_btn.setEnabled(False)
+        else:
+            self.empty_state_label.setVisible(False)
+            self.table.setVisible(True)
 
         for row, product in enumerate(self.products):
             category_name = ""
@@ -123,7 +153,9 @@ class ProductsScreen(QWidget):
                     quantity_in_stock=data["quantity_in_stock"],
                     reorder_level=data["reorder_level"],
                 )
+                QMessageBox.information(self, "Success", "Product added successfully.")
                 self.load_products()
+                app_signals.product_changed.emit()
             except Exception as exc:
                 QMessageBox.critical(self, "Error", str(exc))
 
@@ -149,7 +181,9 @@ class ProductsScreen(QWidget):
                     quantity_in_stock=data["quantity_in_stock"],
                     reorder_level=data["reorder_level"],
                 )
+                QMessageBox.information(self, "Success", "Product updated successfully.")
                 self.load_products()
+                app_signals.product_changed.emit()
             except Exception as exc:
                 QMessageBox.critical(self, "Error", str(exc))
 
@@ -169,7 +203,9 @@ class ProductsScreen(QWidget):
 
         try:
             self.product_service.delete_product(product.id)
+            QMessageBox.information(self, "Success", "Product removed successfully.")
             self.load_products()
+            app_signals.product_changed.emit()
         except Exception as exc:
             QMessageBox.critical(self, "Error", str(exc))
 
@@ -189,6 +225,7 @@ class ProductsScreen(QWidget):
                     quantity=data["quantity"],
                     reference=data["reference"],
                 )
+                QMessageBox.information(self, "Success", "Stock updated successfully.")
                 self.load_products()
             except Exception as exc:
                 QMessageBox.critical(self, "Error", str(exc))

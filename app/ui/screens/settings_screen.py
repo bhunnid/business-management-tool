@@ -1,11 +1,114 @@
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QDoubleSpinBox,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
+
+from app.database.seed import ensure_default_business
+from app.services.settings_service import SettingsService
 
 
 class SettingsScreen(QWidget):
     def __init__(self) -> None:
         super().__init__()
 
+        self.business = ensure_default_business()
+        self.settings_service = SettingsService()
+
+        self.title = QLabel("Settings")
+        self.title.setStyleSheet("font-size: 18px; font-weight: 600;")
+
+        # Business Profile Section
+        profile_section = QLabel("Business Profile")
+        profile_section.setStyleSheet("font-size: 14px; font-weight: 600;")
+
+        form = QFormLayout()
+
+        # Business Name
+        self.business_name_input = QLineEdit()
+        self.business_name_input.setText(self.business.business_name or "")
+        form.addRow("Business Name:", self.business_name_input)
+
+        # Phone
+        self.phone_input = QLineEdit()
+        self.phone_input.setText(self.business.phone or "")
+        self.phone_input.setPlaceholderText("e.g. +254712345678")
+        form.addRow("Phone:", self.phone_input)
+
+        # Location
+        self.location_input = QLineEdit()
+        self.location_input.setText(self.business.location or "")
+        self.location_input.setPlaceholderText("e.g. Nairobi or Shop Address")
+        form.addRow("Location:", self.location_input)
+
+        # Preferences Section
+        preferences_section = QLabel("Preferences")
+        preferences_section.setStyleSheet("font-size: 14px; font-weight: 600; margin-top: 20px;")
+
+        # Currency
+        self.currency_input = QLineEdit()
+        self.currency_input.setText(self.business.currency or "KES")
+        self.currency_input.setPlaceholderText("e.g. KES")
+        form.addRow("Currency:", self.currency_input)
+
+        # Tax Percent
+        self.tax_percent_input = QDoubleSpinBox()
+        self.tax_percent_input.setDecimals(2)
+        self.tax_percent_input.setRange(0.0, 100.0)
+        self.tax_percent_input.setValue(float(self.business.tax_percent or 0.0))
+        self.tax_percent_input.setSuffix(" %")
+        form.addRow("Tax (%):", self.tax_percent_input)
+
+        # Receipt Footer
+        self.receipt_footer_input = QLineEdit()
+        self.receipt_footer_input.setText(self.business.receipt_footer or "")
+        self.receipt_footer_input.setPlaceholderText("e.g. Thank you for your purchase!")
+        form.addRow("Receipt Footer:", self.receipt_footer_input)
+
+        # Buttons
+        save_btn = QPushButton("Save Settings")
+        save_btn.setStyleSheet("padding: 10px; font-size: 12px;")
+        save_btn.clicked.connect(self.save_settings)
+
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        button_layout.addWidget(save_btn)
+
+        # Layout
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Settings"))
-        layout.addWidget(QLabel("Later: business profile, backup, currency, tax"))
+        layout.addWidget(self.title)
+        layout.addWidget(profile_section)
+        layout.addLayout(form)
+        layout.addLayout(button_layout)
         layout.addStretch()
+
+    def save_settings(self) -> None:
+        """Save business settings."""
+        try:
+            business_name = self.business_name_input.text().strip()
+            if not business_name:
+                QMessageBox.warning(self, "Invalid Input", "Business name is required.")
+                return
+
+            self.settings_service.update_business_settings(
+                business_id=self.business.id,
+                business_name=business_name,
+                phone=self.phone_input.text(),
+                location=self.location_input.text(),
+                currency=self.currency_input.text(),
+                tax_percent=self.tax_percent_input.value(),
+                receipt_footer=self.receipt_footer_input.text(),
+            )
+
+            QMessageBox.information(self, "Success", "Settings saved successfully!")
+            # Refresh business object
+            self.business = self.settings_service.get_business_settings(self.business.id)
+        except Exception as exc:
+            QMessageBox.critical(self, "Error", f"Failed to save settings: {exc}")
