@@ -1,0 +1,123 @@
+Database schema for Business Management Tool
+
+Tables:
+
+1. businesses
+   - id: INTEGER PRIMARY KEY
+   - business_name: VARCHAR(150) NOT NULL
+   - business_type: VARCHAR(100) NULL
+   - phone: VARCHAR(30) NULL
+   - location: VARCHAR(150) NULL
+   - currency: VARCHAR(10) NULL DEFAULT 'KES'
+   - tax_percent: FLOAT NULL DEFAULT 0.0
+   - receipt_footer: VARCHAR(500) NULL
+   - created_at: DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+   
+   Relationships:
+   - users: one-to-many -> users.business_id
+   - categories: one-to-many -> categories.business_id
+   - products: one-to-many -> products.business_id
+
+2. users
+   - id: INTEGER PRIMARY KEY
+   - business_id: INTEGER NOT NULL REFERENCES businesses(id)
+   - name: VARCHAR(120) NOT NULL
+   - username: VARCHAR(80) NOT NULL UNIQUE
+   - email: VARCHAR(120) NULL
+   - phone: VARCHAR(30) NULL
+   - password_hash: VARCHAR(255) NOT NULL
+   - pin_hash: VARCHAR(255) NULL
+   - role: VARCHAR(50) NOT NULL DEFAULT 'owner'
+   - status: BOOLEAN NOT NULL DEFAULT TRUE
+   - must_change_password: BOOLEAN NOT NULL DEFAULT FALSE
+   - last_login_at: DATETIME NULL
+
+3. categories
+   - id: INTEGER PRIMARY KEY
+   - business_id: INTEGER NOT NULL REFERENCES businesses(id)
+   - name: VARCHAR(100) NOT NULL
+   
+   Constraints:
+   - UNIQUE(business_id, name)
+   
+   Relationships:
+   - business: many-to-one -> businesses.id
+   - products: one-to-many -> products.category_id
+
+4. products
+   - id: INTEGER PRIMARY KEY
+   - business_id: INTEGER NOT NULL REFERENCES businesses(id)
+   - category_id: INTEGER NULL REFERENCES categories(id)
+   - sku: VARCHAR(80) NULL
+   - barcode: VARCHAR(120) NULL
+   - name: VARCHAR(150) NOT NULL
+   - buying_price: FLOAT NOT NULL DEFAULT 0.0
+   - selling_price: FLOAT NOT NULL DEFAULT 0.0
+   - quantity_in_stock: FLOAT NOT NULL DEFAULT 0.0
+   - reorder_level: FLOAT NOT NULL DEFAULT 0.0
+   - expiry_date: DATE NULL
+   - image_path: VARCHAR(255) NULL
+   - active: BOOLEAN NOT NULL DEFAULT TRUE
+   
+   Relationships:
+   - business: many-to-one -> businesses.id
+   - category: many-to-one -> categories.id
+   - sale_items: one-to-many -> sale_items.product_id
+   - stock_movements: one-to-many -> stock_movements.product_id
+
+5. sales
+   - id: INTEGER PRIMARY KEY
+   - business_id: INTEGER NOT NULL REFERENCES businesses(id)
+   - cashier_id: INTEGER NULL REFERENCES users(id)
+   - subtotal: FLOAT NOT NULL DEFAULT 0.0
+   - discount: FLOAT NOT NULL DEFAULT 0.0
+   - total: FLOAT NOT NULL DEFAULT 0.0
+   - payment_method: VARCHAR(30) NOT NULL
+   - payment_status: VARCHAR(30) NOT NULL DEFAULT 'paid'
+   - transaction_ref: VARCHAR(120) NULL
+   - created_at: DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+   
+   Relationships:
+   - items: one-to-many -> sale_items.sale_id
+
+6. sale_items
+   - id: INTEGER PRIMARY KEY
+   - sale_id: INTEGER NOT NULL REFERENCES sales(id)
+   - product_id: INTEGER NOT NULL REFERENCES products(id)
+   - quantity: FLOAT NOT NULL
+   - unit_price: FLOAT NOT NULL
+   - line_total: FLOAT NOT NULL
+   
+   Relationships:
+   - sale: many-to-one -> sales.id
+   - product: many-to-one -> products.id
+
+7. stock_movements
+   - id: INTEGER PRIMARY KEY
+   - product_id: INTEGER NOT NULL REFERENCES products(id)
+   - movement_type: VARCHAR(50) NOT NULL
+   - quantity: FLOAT NOT NULL
+   - cost_price: FLOAT NULL
+   - selling_price: FLOAT NULL
+   - reference: VARCHAR(150) NULL
+   - created_by: INTEGER NULL REFERENCES users(id)
+   - created_at: DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+   
+   Relationships:
+   - product: many-to-one -> products.id
+
+8. expenses
+   - id: INTEGER PRIMARY KEY
+   - business_id: INTEGER NOT NULL REFERENCES businesses(id)
+   - recorded_by: INTEGER NULL REFERENCES users(id)
+   - category: VARCHAR(80) NOT NULL
+   - description: TEXT NULL
+   - amount: FLOAT NOT NULL
+   - payment_method: VARCHAR(30) NOT NULL DEFAULT 'cash'
+   - reference: VARCHAR(120) NULL
+   - created_at: DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+
+Notes:
+- All tables are defined via SQLAlchemy declarative models in `app/database/models/`.
+- The SQLite database file is normally created at `data/app.db` unless overridden by `DATABASE_URL`.
+- `created_at` columns use UTC timestamp defaults from Python `datetime.utcnow`.

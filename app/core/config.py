@@ -1,12 +1,17 @@
-from pathlib import Path
 import os
+import sys
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(sys.executable).resolve().parent
+else:
+    BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
 DATA_DIR = BASE_DIR / "data"
-DATA_DIR.mkdir(exist_ok=True)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 APP_NAME = os.getenv("APP_NAME", "Business Management Tool")
 APP_ENV = os.getenv("APP_ENV", "development")
