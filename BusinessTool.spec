@@ -1,12 +1,33 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 
+import sys
+from pathlib import Path
+
+project_dir = Path(sys.argv[0]).resolve().parent
+alembic_files = [
+    (str(path), 'alembic')
+    for path in (project_dir / 'alembic').rglob('*')
+    if path.is_file()
+]
+qss_files = [
+    (str(path), 'app/ui/design_system')
+    for path in (project_dir / 'app/ui/design_system').rglob('*.qss')
+    if path.is_file()
+]
+
 a = Analysis(
     ['main.py'],
-    pathex=[],
+    pathex=[str(project_dir)],
     binaries=[],
-    datas=[],
-    hiddenimports=[],
+    datas=[
+        (str(project_dir / 'alembic.ini'), '.'),
+        *alembic_files,
+        *qss_files,
+    ],
+    hiddenimports=[
+        'logging.config',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

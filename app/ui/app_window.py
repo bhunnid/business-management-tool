@@ -55,9 +55,25 @@ class AppWindow(QMainWindow):
 
         # Show first-run setup or login depending on owner existence
         if self.auth_service.owner_exists():
-            self.setCentralWidget(self.login_screen)
+            self.set_centered_widget(self.login_screen)
         else:
             self.setCentralWidget(self.first_time_setup_screen)
+
+    def set_centered_widget(self, widget: QWidget) -> None:
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addStretch(1)
+
+        row = QHBoxLayout()
+        row.addStretch(1)
+        row.addWidget(widget)
+        row.addStretch(1)
+        layout.addLayout(row)
+
+        layout.addStretch(1)
+        self.setCentralWidget(container)
 
     def setup_navigation(self):
         """Setup navigation items based on user role."""
@@ -185,5 +201,5 @@ class AppWindow(QMainWindow):
         SessionManager.logout_user()
         self.login_screen = LoginScreen(business_name=self.get_business_name())
         self.login_screen.login_successful.connect(self.show_main_interface)
-        self.setCentralWidget(self.login_screen)
+        self.set_centered_widget(self.login_screen)
         self.setWindowTitle("Business Management Tool")

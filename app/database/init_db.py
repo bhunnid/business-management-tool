@@ -1,4 +1,5 @@
 import logging
+import sys
 from pathlib import Path
 
 from alembic import command
@@ -13,10 +14,17 @@ logger = logging.getLogger(__name__)
 
 
 def init_db() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    alembic_ini = repo_root / "alembic.ini"
+    if getattr(sys, "frozen", False):
+        base_path = Path(sys._MEIPASS)
+    else:
+        base_path = Path(__file__).resolve().parents[2]
+
+    alembic_ini = base_path / "alembic.ini"
+    if not alembic_ini.exists():
+        raise FileNotFoundError(f"Alembic configuration not found: {alembic_ini}")
 
     cfg = Config(str(alembic_ini))
+    cfg.set_main_option('script_location', str(alembic_ini.parent / 'alembic'))
 
     # If the database has no alembic version table, treat it as fresh/unmanaged.
     # This makes startup resilient even if the file DB exists without migration metadata.

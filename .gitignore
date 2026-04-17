@@ -8,6 +8,8 @@ venv/
 env/
 dist/
 build/
+build-pyinstaller/
+dist-pyinstaller/
 
 # Environment
 .env
